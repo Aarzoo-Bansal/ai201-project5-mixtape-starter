@@ -2,7 +2,15 @@
 
 ## AI Usage
 
-*(To be completed in Milestone 4, after all bugs are fixed — this section will describe specifically how AI was used to navigate and debug, and where its output was verified or overridden.)*
+I used Claude (in Cowork, with direct file access to this repo and a sandboxed shell) as an active collaborator throughout this project, not just for code generation. A few notes on the constraints and division of labor: Claude's sandbox couldn't reach PyPI or GitHub, so it couldn't `pip install` or run the Flask app itself. All environment setup, running the server, running `pytest`, and executing `curl`/`flask shell` commands were done by me, in my own terminal; Claude read the output I pasted back and used it to drive the next step.
+
+**Codebase orientation:** Claude read `README.md` and every file in `app.py`, `models.py`, `routes/`, and `services/` before touching any issue, and wrote the codebase map above from that reading — including tracing the rate-a-song and view-a-playlist data flows end to end. This matched the "read before you search" guidance; I reviewed the map for accuracy rather than accepting it uncritically.
+
+**Bug identification:** For Issues #1, #4, and #5, Claude found the root cause purely by reading the relevant service file and comparing it against its own docstring or a sibling function (e.g., comparing `add_to_playlist()` to `rate_song()` line-by-line to spot the missing notification call for Issue #4). I verified each of these against the failing pytest output (#1, #5) or live curl output (#4) before accepting them as confirmed rather than just plausible.
+
+**Where I had to push back / verify independently:** For Issue #3 (search duplicates), Claude's initial read of the code (an un-deduplicated join to `song_tags`) predicted duplicate results, matching the test comment ("this one will duplicate in search results with the bug"). But when I ran `pytest tests/test_search.py`, it passed in full — no duplicates. Rather than accepting either the code-reading prediction or the passing test at face value, Claude proposed a three-way check: a raw `sqlite3` query directly against the seeded database (to confirm the join really does produce 3 rows at the SQL level), the live `/songs/search` endpoint, and an isolated `flask shell` call to `search_songs()` directly. I ran all three. They showed the raw SQL does produce 3 duplicate rows, but the installed SQLAlchemy version (2.0.51) collapses them via identity-map deduplication before they reach the caller — so the "bug" as written doesn't actually manifest in this environment. This is a case where Claude's static code reading was technically correct about what the code does but wrong about the observable behavior, and only executing the code (which I had to do, since Claude couldn't run Python/Flask itself) resolved the discrepancy. We documented this as a legitimate non-reproduction rather than forcing a fix for a bug that doesn't occur.
+
+**Where I made the calls:** I decided how to handle the Issue #3 finding (skip it, document the investigation, fix 4 bugs instead of hunting further), and I ran and read every verification step (pytest output, curl responses, `git log`) before committing — Claude proposed fixes and reproduction steps, but nothing was committed without me confirming the actual behavior first.
 
 ## Codebase Map
 
